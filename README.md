@@ -5,41 +5,18 @@ It can be used in your current session or target another domain by using other c
 
 ```ps1
 .\Get-GPOPermissions.ps1 -h
-SYNOPSIS
-    Get-GPOPermissions
-    Audits GPO permissions in Active Directory. Reports any principal granted more
-    than read-only access on GPO objects, excluding built-in privileged accounts.
-
 USAGE
-    .\gpo_test.ps1 [[-GPOName] <string>] [-Server <string>] [-Domain <string>]
-                   [-User <string>] [-Password <string>] [-PageSize <int>] [-Help]
+    Get-GPOPermissions.ps1 [[-GPOName] <string>] [-Server <string>] [-Domain <string>]
+                           [-User <string>] [-Password <string>] [-PageSize <int>] [-Help]
 
 PARAMETERS
-    -GPOName <string>
-        GPO display name filter. Wildcards (*) accepted. Default: * (all GPOs).
-
-    -Server <string>
-        Domain controller to connect to (hostname or IP). Takes precedence over
-        -Domain for DC selection. If omitted alongside -Domain, the current
-        domain is queried.
-
-    -Domain <string>
-        Target domain FQDN (e.g. demo.local). Used for automatic DC discovery
-        via DNS SRV records when -Server is not specified.
-
-    -User <string>
-        Username for cross-domain authentication.
-        Formats accepted:  DOMAIN\username   or   username@domain.fqdn
-
-    -Password <string>
-        Password for -User. If -User is specified and -Password is omitted,
-        the script prompts securely (input is masked).
-
-    -PageSize <int>
-        LDAP paging size. Range: 1-10000. Default: 200.
-
-    -Help / -h
-        Display this help message.
+    -GPOName    GPO display name filter (* wildcard). Default: * (all GPOs).
+    -Server     Domain controller hostname or IP.
+    -Domain     Target domain FQDN (e.g. demo.local) for automatic DC discovery.
+    -User       Username: DOMAIN\user or user@domain.fqdn
+    -Password   Password for -User (prompted securely if omitted).
+    -PageSize   LDAP paging size 1-10000. Default: 200.
+    -Help / -h  Show this help.
 
 EXCLUSIONS
     The following are always excluded from results:
@@ -47,33 +24,13 @@ EXCLUSIONS
       - CREATOR OWNER   (S-1-3-0)
       - Domain Admins   (RID 512)
       - Enterprise Admins (RID 519)
-      - Authenticated Users with "Apply Group Policy" right only
-
-OUTPUT FIELDS
-    GPODisplayName        Display name of the GPO
-    ADSPath               LDAP path of the GPO object
-    IdentitySID           SID of the identity holding the permission
-    IdentityName          Resolved name of the identity
-    ActiveDirectoryRights Rights granted (e.g. WriteProperty, WriteDacl)
-    IsInherited           Whether the ACE is inherited
-    ObjectType            GUID of the specific attribute or extended right
-    InheritanceType       Inheritance scope of the ACE
+      - "Apply Group Policy" extended right (edacfd8f-ffb3-11d1-b41d-00a0c968f939)
 
 EXAMPLES
-    # Current domain - all GPOs
-    .\gpo_test.ps1
-
-    # Filter by GPO name
-    .\gpo_test.ps1 -GPOName "Default*"
-
-    # Cross-domain - prompts securely for password
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest
-
-    # Cross-domain - target a specific DC, password inline
-    .\gpo_test.ps1 -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
-
-    # Export to CSV
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest | Export-Csv gpo_perms.csv -NoTypeInformation
+    Get-GPOPermissions.ps1
+    Get-GPOPermissions.ps1 -GPOName "Default*" | Export-Csv gpo_perms.csv -NoTypeInformation
+    Get-GPOPermissions.ps1 -Domain demo.local -User demo\admintest
+    Get-GPOPermissions.ps1 -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
 
 NOTES
     -Server vs -Domain:
