@@ -1,50 +1,40 @@
 function Get-GPOPermissions {
 <#
 .SYNOPSIS
-    Finds users or groups that have more than Read permissions on GPO objects.
-
-.DESCRIPTION
-    Flags any ACL entry that grants rights beyond GenericRead while excluding
-    default high-privilege accounts (Domain Admins, Enterprise Admins, SYSTEM, CREATOR OWNER).
+    Audits GPO ACLs and reports principals with rights beyond read-only.
 
 .PARAMETER Help
     Display usage information.
 
 .PARAMETER GPOName
-    GPO display name to query (wildcards accepted). Default: * (all GPOs).
+    GPO display name filter (wildcards accepted). Default: * (all GPOs).
 
 .PARAMETER PageSize
-    LDAP paging size. Range: 1-10000. Default: 200.
+    LDAP paging size (1-10000). Default: 200.
 
 .PARAMETER Server
-    Domain controller to connect to (hostname or IP). Takes precedence over -Domain for
-    DC selection. If omitted alongside -Domain, the current domain is queried.
+    Domain controller hostname or IP.
 
 .PARAMETER Domain
-    FQDN of the target domain (e.g. demo.local). Used for automatic DC discovery via DNS
-    SRV records when -Server is not specified.
+    Target domain FQDN for automatic DC discovery.
 
 .PARAMETER User
-    Username for cross-domain authentication (e.g. demo\admintest or admintest@demo.local).
+    Username for cross-domain authentication (DOMAIN\user or user@domain).
 
 .PARAMETER Password
-    Password for -User. If -User is specified and -Password is omitted, the script
-    prompts securely (input is masked).
+    Password for -User (prompted securely if omitted).
 
 .EXAMPLE
-    .\gpo_test.ps1
+    Get-GPOPermissions
 
 .EXAMPLE
-    .\gpo_test.ps1 -GPOName "Default*"
+    Get-GPOPermissions -GPOName "Default*" | Export-Csv gpo_perms.csv -NoTypeInformation
 
 .EXAMPLE
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest
+    Get-GPOPermissions -Domain demo.local -User demo\admintest
 
 .EXAMPLE
-    .\gpo_test.ps1 -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
-
-.EXAMPLE
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest | Export-Csv gpo_perms.csv -NoTypeInformation
+    Get-GPOPermissions -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
 #>
 
     [CmdletBinding()]
@@ -68,84 +58,28 @@ function Get-GPOPermissions {
     if ($Help) {
         Write-Host @"
 
-SYNOPSIS
-    Get-GPOPermissions
-    Audits GPO permissions in Active Directory. Reports any principal granted more
-    than read-only access on GPO objects, excluding built-in privileged accounts.
-
 USAGE
-    .\gpo_test.ps1 [[-GPOName] <string>] [-Server <string>] [-Domain <string>]
-                   [-User <string>] [-Password <string>] [-PageSize <int>] [-Help]
+    Get-GPOPermissions.ps1 [[-GPOName] <string>] [-Server <string>] [-Domain <string>]
+                           [-User <string>] [-Password <string>] [-PageSize <int>] [-Help]
 
 PARAMETERS
-    -GPOName <string>
-        GPO display name filter. Wildcards (*) accepted. Default: * (all GPOs).
-
-    -Server <string>
-        Domain controller to connect to (hostname or IP). Takes precedence over
-        -Domain for DC selection. If omitted alongside -Domain, the current
-        domain is queried.
-
-    -Domain <string>
-        Target domain FQDN (e.g. demo.local). Used for automatic DC discovery
-        via DNS SRV records when -Server is not specified.
-
-    -User <string>
-        Username for cross-domain authentication.
-        Formats accepted:  DOMAIN\username   or   username@domain.fqdn
-
-    -Password <string>
-        Password for -User. If -User is specified and -Password is omitted,
-        the script prompts securely (input is masked).
-
-    -PageSize <int>
-        LDAP paging size. Range: 1-10000. Default: 200.
-
-    -Help / -h
-        Display this help message.
+    -GPOName    GPO display name filter (* wildcard). Default: * (all GPOs).
+    -Server     Domain controller hostname or IP.
+    -Domain     Target domain FQDN (e.g. demo.local) for automatic DC discovery.
+    -User       Username: DOMAIN\user or user@domain.fqdn
+    -Password   Password for -User (prompted securely if omitted).
+    -PageSize   LDAP paging size 1-10000. Default: 200.
+    -Help / -h  Show this help.
 
 EXCLUSIONS
-    The following are always excluded from results:
-      - SYSTEM          (S-1-5-18)
-      - CREATOR OWNER   (S-1-3-0)
-      - Domain Admins   (RID 512)
-      - Enterprise Admins (RID 519)
-      - Authenticated Users with "Apply Group Policy" right only
-
-OUTPUT FIELDS
-    GPODisplayName        Display name of the GPO
-    ADSPath               LDAP path of the GPO object
-    IdentitySID           SID of the identity holding the permission
-    IdentityName          Resolved name of the identity
-    ActiveDirectoryRights Rights granted (e.g. WriteProperty, WriteDacl)
-    IsInherited           Whether the ACE is inherited
-    ObjectType            GUID of the specific attribute or extended right
-    InheritanceType       Inheritance scope of the ACE
+    SYSTEM (S-1-5-18), CREATOR OWNER (S-1-3-0), Domain Admins (RID 512),
+    Enterprise Admins (RID 519), and the "Apply Group Policy" extended right.
 
 EXAMPLES
-    # Current domain - all GPOs
-    .\gpo_test.ps1
-
-    # Filter by GPO name
-    .\gpo_test.ps1 -GPOName "Default*"
-
-    # Cross-domain - prompts securely for password
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest
-
-    # Cross-domain - target a specific DC, password inline
-    .\gpo_test.ps1 -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
-
-    # Export to CSV
-    .\gpo_test.ps1 -Domain demo.local -User demo\admintest | Export-Csv gpo_perms.csv -NoTypeInformation
-
-NOTES
-    -Server vs -Domain:
-      Use -Server to target a specific DC (useful when DNS resolution fails or
-      you need a particular DC). Use -Domain to let Windows auto-discover a DC
-      via DNS SRV lookup. Both can be combined; -Server takes priority.
-
-    Requires network access to the target domain controller on LDAP (TCP 389)
-    and read access to the GPO objects in SYSVOL/Active Directory.
+    Get-GPOPermissions.ps1
+    Get-GPOPermissions.ps1 -GPOName "Default*" | Export-Csv gpo_perms.csv -NoTypeInformation
+    Get-GPOPermissions.ps1 -Domain demo.local -User demo\admintest
+    Get-GPOPermissions.ps1 -Server dc01.demo.local -User admintest@demo.local -Password P@ssw0rd
 
 "@
         return
@@ -290,18 +224,43 @@ NOTES
                 # Skip excluded SIDs
                 if ($ExcludedSIDs.Contains($Sid)) { continue }
 
-                # Skip default "Authenticated Users / Apply Group Policy" ACE
-                if (
-                    $Sid -eq 'S-1-5-11' -and
-                    $Ace.ActiveDirectoryRights -eq [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight -and
-                    $Ace.ObjectType -eq $ApplyGPOGuid
-                ) { continue }
+                # Skip "Apply Group Policy" extended right (any principal)
+                if ($Ace.ObjectType -eq $ApplyGPOGuid) { continue }
+
+                # Resolve SID to a name: try local translation first, then LDAP lookup
+                $IdentityName = $Ace.IdentityReference.Value
+                if ($IdentityName -match '^S-\d+-') {
+                    $resolved = $null
+                    try {
+                        $resolved = ([System.Security.Principal.SecurityIdentifier]$Sid).Translate(
+                            [System.Security.Principal.NTAccount]
+                        ).Value
+                    } catch { }
+
+                    if (-not $resolved) {
+                        try {
+                            $SidBytes = New-Object byte[] ([System.Security.Principal.SecurityIdentifier]$Sid).BinaryLength
+                            ([System.Security.Principal.SecurityIdentifier]$Sid).GetBinaryForm($SidBytes, 0)
+                            $OctetStr  = ($SidBytes | ForEach-Object { '\{0:x2}' -f $_ }) -join ''
+                            $SidSearch = New-Object System.DirectoryServices.DirectorySearcher($DomainEntry)
+                            $SidSearch.Filter = "(objectSid=$OctetStr)"
+                            [void]$SidSearch.PropertiesToLoad.Add('sAMAccountName')
+                            $SidResult = $SidSearch.FindOne()
+                            $SidSearch.Dispose()
+                            if ($SidResult -and $SidResult.Properties['sAMAccountName'].Count -gt 0) {
+                                $resolved = $SidResult.Properties['sAMAccountName'][0]
+                            }
+                        } catch { }
+                    }
+
+                    if ($resolved) { $IdentityName = $resolved }
+                }
 
                 [PSCustomObject]@{
                     GPODisplayName        = $GpoDisplayName
                     ADSPath               = $GpoPath
                     IdentitySID           = $Sid
-                    IdentityName          = $Ace.IdentityReference.Value
+                    IdentityName          = $IdentityName
                     ActiveDirectoryRights = $Ace.ActiveDirectoryRights
                     IsInherited           = $Ace.IsInherited
                     ObjectType            = $Ace.ObjectType
